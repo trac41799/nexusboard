@@ -59,8 +59,23 @@ model User {
   uploadedFiles     Attachment[]      @relation("AttachmentUploader")
   notifications     Notification[]
   auditLogs         AuditLog[]
+  authTokens        AuthToken[]
 
   @@map("users")
+}
+
+model AuthToken {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  type      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_tokens")
 }
 
 model Workspace {

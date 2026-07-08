@@ -1,9 +1,13 @@
 import 'dotenv/config';
-import express, { NextFunction, Request, Response } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import authRouter from './auth/router';
+import workspacesRouter from './workspaces/router';
+import tasksRouter from './tasks/router';
+import commentsRouter from './comments/router';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 const app = express();
 const PORT = Number(process.env.PORT ?? 3000);
@@ -32,20 +36,16 @@ app.get('/api/health', (_req: Request, res: Response) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/workspaces', workspacesRouter);
+app.use('/api/tasks', tasksRouter);
+app.use('/api/tasks/:taskId/comments', commentsRouter);
 
 /* ------------------------------------------------------------------ *
  * 404 + error handling
  * ------------------------------------------------------------------ */
 
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.path} not found` } });
-});
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[server] unhandled error:', err);
-  res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' } });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 /* ------------------------------------------------------------------ *
  * Bootstrap

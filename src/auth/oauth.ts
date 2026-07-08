@@ -56,7 +56,7 @@ export async function findOrCreateOAuthUser(
   const created = await prisma.user.create({
     data: {
       email: profile.email,
-      name: profile.name,
+      name: profile.name ?? profile.email,
       avatarUrl: profile.avatarUrl,
       oauthProvider: profile.provider,
       oauthId: profile.oauthId,
