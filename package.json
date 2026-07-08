@@ -1,0 +1,19 @@
+{
+  "name": "nexusboard",
+  "version": "1.0.0",
+  "description": "A full-stack team collaboration platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "prisma": {
+    "schema": "prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.2"
+  },
+  "devDependencies": {
+    "prisma": "^6.16.2"
+  }
+}
