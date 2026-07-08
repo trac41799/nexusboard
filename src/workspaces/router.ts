@@ -5,7 +5,7 @@ import prisma from '../lib/prisma';
 import { authenticateToken } from '../auth/middleware';
 import { validate } from '../middleware/validate';
 import { asyncHandler, HttpError } from '../middleware/errorHandler';
-import { canManageMembers, requireWorkspaceAccess, requireWorkspaceOwner } from '../lib/access';
+import { checkMemberManagement, checkWorkspaceAccess, checkWorkspaceOwner } from '../lib/access';
 
 const router = Router();
 
@@ -106,7 +106,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const userId = req.user!.id;
     const { id } = req.params;
-    await requireWorkspaceAccess(userId, id);
+    await checkWorkspaceAccess(userId, id);
 
     const workspace = await prisma.workspace.findUnique({
       where: { id },
@@ -136,10 +136,7 @@ router.patch(
     const { id } = req.params;
     const { name } = req.body as z.infer<typeof updateBody>;
 
-    const { isOwner, membership } = await requireWorkspaceAccess(userId, id);
-    if (!canManageMembers(isOwner, membership)) {
-      throw HttpError.forbidden('Only an owner or admin can update the workspace');
-    }
+    await checkMemberManagement(userId, id);
 
     const workspace = await prisma.workspace.update({ where: { id }, data: { name } });
     res.status(200).json({ workspace });
@@ -157,7 +154,7 @@ router.delete(
     const userId = req.user!.id;
     const { id } = req.params;
 
-    await requireWorkspaceOwner(userId, id);
+    await checkWorkspaceOwner(userId, id);
     await prisma.workspace.delete({ where: { id } });
 
     res.status(204).send();
@@ -176,10 +173,7 @@ router.post(
     const { id } = req.params;
     const { userId, role } = req.body as z.infer<typeof addMemberBody>;
 
-    const { isOwner, membership } = await requireWorkspaceAccess(callerId, id);
-    if (!canManageMembers(isOwner, membership)) {
-      throw HttpError.forbidden('Only an owner or admin can add members');
-    }
+    await checkMemberManagement(callerId, id);
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) {
@@ -213,13 +207,14 @@ router.delete(
     const callerId = req.user!.id;
     const { id, userId } = req.params;
 
-    const { isOwner, membership, ownerId } = await requireWorkspaceAccess(callerId, id);
+    const workspace = await prisma.workspace.findUnique({ where: { id } });
+    if (!workspace) throw HttpError.notFound('Workspace not found');
 
     const removingSelf = callerId === userId;
-    if (!removingSelf && !canManageMembers(isOwner, membership)) {
-      throw HttpError.forbidden('Only an owner or admin can remove members');
+    if (!removingSelf) {
+      await checkMemberManagement(callerId, id);
     }
-    if (userId === ownerId) {
+    if (userId === workspace.ownerId) {
       throw HttpError.badRequest('The workspace owner cannot be removed');
     }
 

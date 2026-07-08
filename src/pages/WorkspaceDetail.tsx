@@ -7,6 +7,7 @@ import {
   type TaskStatus,
   type WorkspaceDetail as WorkspaceDetailType,
 } from '../api/types'
+import { useSocket } from '../hooks/useSocket'
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
   TODO: 'To Do',
@@ -31,6 +32,7 @@ const PRIORITY_STYLES: Record<string, string> = {
 
 export default function WorkspaceDetail() {
   const { id } = useParams<{ id: string }>()
+  const socket = useSocket(id)
   const [workspace, setWorkspace] = useState<WorkspaceDetailType | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,6 +63,22 @@ export default function WorkspaceDetail() {
   useEffect(() => {
     if (id) void loadData(id)
   }, [id])
+
+  useEffect(() => {
+    if (!socket) return
+    const onTaskCreated = (task: Task) => {
+      setTasks((prev) => [task, ...prev])
+    }
+    const onTaskUpdated = (updated: Task) => {
+      setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+    }
+    socket.on('task:created', onTaskCreated)
+    socket.on('task:updated', onTaskUpdated)
+    return () => {
+      socket.off('task:created', onTaskCreated)
+      socket.off('task:updated', onTaskUpdated)
+    }
+  }, [socket])
 
   const filteredTasks = useMemo(
     () => (filter === 'ALL' ? tasks : tasks.filter((t) => t.status === filter)),

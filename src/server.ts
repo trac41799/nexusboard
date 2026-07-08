@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { createServer } from 'http';
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -8,8 +9,10 @@ import workspacesRouter from './workspaces/router';
 import tasksRouter from './tasks/router';
 import commentsRouter from './comments/router';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { createSocketServer } from './socket/handler';
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = Number(process.env.PORT ?? 3000);
 
 /* ------------------------------------------------------------------ *
@@ -48,13 +51,20 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 /* ------------------------------------------------------------------ *
+ * Socket.IO real-time engine
+ * ------------------------------------------------------------------ */
+
+const io = createSocketServer(httpServer);
+
+/* ------------------------------------------------------------------ *
  * Bootstrap
  * ------------------------------------------------------------------ */
 
 if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`[server] NexusBoard API listening on http://localhost:${PORT}`);
+  httpServer.listen(PORT, () => {
+    console.log(`[server] NexusBoard API + Socket.IO listening on http://localhost:${PORT}`);
   });
 }
 
+export { app, httpServer, io };
 export default app;

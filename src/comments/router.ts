@@ -4,7 +4,7 @@ import prisma from '../lib/prisma';
 import { authenticateToken } from '../auth/middleware';
 import { validate } from '../middleware/validate';
 import { asyncHandler, HttpError } from '../middleware/errorHandler';
-import { requireWorkspaceAccess } from '../lib/access';
+import { checkWorkspaceAccess } from '../lib/access';
 
 // mergeParams so `:taskId` from the parent mount path is available here.
 const router = Router({ mergeParams: true });
@@ -35,7 +35,7 @@ async function requireTaskAccess(taskId: string, userId: string): Promise<string
   if (!task) {
     throw HttpError.notFound('Task not found');
   }
-  await requireWorkspaceAccess(userId, task.workspaceId);
+  await checkWorkspaceAccess(userId, task.workspaceId);
   return task.workspaceId;
 }
 

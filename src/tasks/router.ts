@@ -5,7 +5,10 @@ import prisma from '../lib/prisma';
 import { authenticateToken } from '../auth/middleware';
 import { validate } from '../middleware/validate';
 import { asyncHandler, HttpError } from '../middleware/errorHandler';
-import { requireWorkspaceAccess } from '../lib/access';
+import { checkWorkspaceAccess } from '../lib/access';
+import { getIO } from '../socket/handler';
+import { EVENTS } from '../socket/handler';
+import { workspaceRoom } from '../socket/rooms';
 
 const router = Router();
 
@@ -74,7 +77,7 @@ async function loadTaskForAccess(taskId: string, userId: string) {
   if (!task) {
     throw HttpError.notFound('Task not found');
   }
-  await requireWorkspaceAccess(userId, task.workspaceId);
+  await checkWorkspaceAccess(userId, task.workspaceId);
   return task;
 }
 
@@ -89,7 +92,7 @@ router.post(
     const userId = req.user!.id;
     const data = req.body as z.infer<typeof createBody>;
 
-    await requireWorkspaceAccess(userId, data.workspaceId);
+    await checkWorkspaceAccess(userId, data.workspaceId);
     if (data.assigneeId) {
       await assertAssigneeIsMember(data.workspaceId, data.assigneeId);
     }
@@ -106,6 +109,18 @@ router.post(
         status: data.status ?? TaskStatus.TODO,
       },
     });
+
+    const fullTask = await prisma.task.findUnique({
+      where: { id: task.id },
+      include: {
+        assignee: { select: { id: true, name: true, avatarUrl: true } },
+        _count: { select: { comments: true } },
+      },
+    });
+
+    try {
+      getIO().to(workspaceRoom(data.workspaceId)).emit(EVENTS.TASK_CREATED, fullTask);
+    } catch { /* socket not initialised yet */ }
 
     res.status(201).json({ task });
   }),
@@ -126,7 +141,7 @@ router.get(
     const where: Prisma.TaskWhereInput = {};
 
     if (workspace) {
-      await requireWorkspaceAccess(userId, workspace);
+      await checkWorkspaceAccess(userId, workspace);
       where.workspaceId = workspace;
     } else {
       where.workspace = {
@@ -212,6 +227,10 @@ router.patch(
       },
     });
 
+    try {
+      getIO().to(workspaceRoom(existing.workspaceId)).emit(EVENTS.TASK_UPDATED, task);
+    } catch { /* socket not initialised yet */ }
+
     res.status(200).json({ task });
   }),
 );
@@ -228,8 +247,12 @@ router.patch(
     const { id } = req.params;
     const { status } = req.body as z.infer<typeof statusBody>;
 
-    await loadTaskForAccess(id, userId);
+    const existing = await loadTaskForAccess(id, userId);
     const task = await prisma.task.update({ where: { id }, data: { status } });
+
+    try {
+      getIO().to(workspaceRoom(existing.workspaceId)).emit(EVENTS.TASK_UPDATED, task);
+    } catch { /* socket not initialised yet */ }
 
     res.status(200).json({ task });
   }),

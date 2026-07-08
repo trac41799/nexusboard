@@ -26,6 +26,7 @@
     "src/vite-env.d.ts",
     "src/api",
     "src/pages",
-    "src/components"
+    "src/components",
+    "src/hooks"
   ]
 }
